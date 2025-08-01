@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>typeMyCode – Professional Typing Practice for Developers</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <div class="brand-logo">
+                    <img src="logo.png" alt="typeMyCode Logo" width="100" height="32">
+                </div>
+                    <span class="brand-name">typeMyCode</span>
+            </div>
+            <div class="nav-links">
+                <a href="docs.html" class="nav-link">Docs & Pricing</a>
+                <button class="btn btn-primary btn-small" id="navStartButton">Start Practicing</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main">
+        <!-- Hero Section -->
+        <section id="textInputSection" class="hero">
+            <div class="hero-container">
+                <div class="hero-content">
+                    <h1 class="hero-title">
+                        Master your coding speed with
+                        <span class="gradient-text">intelligent practice</span>
+                    </h1>
+                    <p class="hero-subtitle">
+                        Professional typing practice designed for developers. Skip comments automatically, 
+                        get smart indentation, and track your progress with precision analytics.
+                    </p>
+                    
+                    <div class="hero-cta">
+                        <button id="heroStartButton" class="btn btn-hero">
+                            <svg width="20" height="40" viewBox="0 0 20 20" fill="none">
+                                <path d="M6.5 5.5L13.5 10L6.5 14.5V5.5Z" fill="currentColor"/>
+                            </svg>
+                            Start Practicing
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Practice Setup Modal -->
+        <div id="practiceSetupModal" class="modal hidden">
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Setup Your Practice Session</h3>
+                    <button id="closeModal" class="btn btn-ghost btn-small">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M12.5 3.5L3.5 12.5M3.5 3.5L12.5 12.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="practice-setup">
+                    <div class="setup-header">
+                        <h4>Choose your language</h4>
+                        <div class="language-selector">
+                            <select id="languageSelect" class="language-select">
+                                <option value="auto">Auto-detect</option>
+                                <option value="cpp">C++</option>
+                                <option value="python">Python</option>
+                                <option value="javascript">JavaScript</option>
+                                <option value="java">Java</option>
+                                <option value="plain">Plain Text</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="code-input">
+                        <textarea 
+                            id="practiceText" 
+                            placeholder="Paste your code here or load a sample..."
+                            spellcheck="false"
+                        ></textarea>
+                        <div class="input-actions">
+                            <button id="sampleButton" class="btn btn-ghost btn-small">
+                                Load sample
+                            </button>
+                            <button id="startButton" class="btn btn-primary btn-large">
+                                Start Practice Session
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="features-list">
+                        <div class="feature-item">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z" fill="currentColor"/>
+                            </svg>
+                            Comments automatically skipped
+                        </div>
+                        <div class="feature-item">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z" fill="currentColor"/>
+                            </svg>
+                            Smart auto-indentation
+                        </div>
+                        <div class="feature-item">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z" fill="currentColor"/>
+                            </svg>
+                            Real-time analytics
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Practice Session -->
+        <section id="typingSection" class="practice hidden">
+            <div class="practice-container">
+                <div class="practice-header">
+                    <div class="practice-nav">
+                        <button id="backButton" class="btn btn-ghost btn-small">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M8.354 1.646a.5.5 0 0 1 0 .708L2.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z" fill="currentColor"/>
+                            </svg>
+                            Back
+                        </button>
+                        <button id="resetButton" class="btn btn-outline btn-small">
+                            Reset
+                        </button>
+                    </div>
+                    
+                    <div class="practice-stats">
+                        <div class="stat">
+                            <div class="stat-value" id="wpm">0</div>
+                            <div class="stat-label">WPM</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" id="accuracy">100%</div>
+                            <div class="stat-label">Accuracy</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" id="timer">00:00</div>
+                            <div class="stat-label">Time</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="editor">
+                    <div class="editor-header">
+                        <div class="editor-tabs">
+                            <div class="editor-tab active">
+                                <div class="tab-icon"></div>
+                                <span id="fileName">practice.py</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="editor-body">
+                        <div class="line-numbers" id="lineNumbers"></div>
+                        <div class="code-area">
+                            <div id="textDisplay" class="code-display" tabindex="0"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="progress">
+                    <div class="progress-info">
+                        <span class="progress-label">Progress</span>
+                        <span class="progress-value" id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>

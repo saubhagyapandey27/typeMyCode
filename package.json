@@ -1,0 +1,45 @@
+{
+  "name": "typemycode",
+  "version": "1.0.0",
+  "description": "Professional typing practice application for developers - Master your coding speed with intelligent practice sessions",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "serve": "python -m http.server 8000",
+    "dev": "python -m http.server 8000",
+    "build": "echo 'Build complete - typeMyCode is ready for deployment'"
+  },
+  "keywords": [
+    "typing",
+    "speed",
+    "practice",
+    "coding",
+    "programming",
+    "developer",
+    "wpm",
+    "accuracy",
+    "c++",
+    "python",
+    "javascript",
+    "java",
+    "professional"
+  ],
+  "author": "typeMyCode Team",
+  "license": "MIT",
+  "homepage": "https://github.com/yourusername/typemycode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/typemycode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/typemycode/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "browserslist": [
+    "last 2 versions",
+    "> 1%",
+    "not dead"
+  ]
+}
