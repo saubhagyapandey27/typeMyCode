@@ -20,11 +20,10 @@ typeMyCode is a premium web-based typing speed practice application specifically
 
 | Language | Features |
 |----------|----------|
-| **C++** 🏗️ | `//` and `/* */` comments, auto-indent after `{`, `(`, `[` |
-| **Python** 🐍 | `#` comments and `"""` docstrings, auto-indent after `:` |
-| **JavaScript** ⚡ | `//` and `/* */` comments, modern syntax support |
-| **Java** ☕ | Complete Java syntax support with smart indentation |
-| **Plain Text** 📝 | Basic typing practice without code-specific features |
+| **Python** 🐍 | `#` comments and `"""` docstrings, auto-skipped leading whitespace |
+| **C++** 🏗️ | `//` and `/* */` comments, auto-skipped leading whitespace |
+| **Go** 🔷 | `//` and `/* */` comments, auto-skipped leading whitespace |
+| **Plain Text** 📝 | Basic typing practice without language-specific comment skips |
 
 ## Features
 

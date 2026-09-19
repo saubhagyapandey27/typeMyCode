@@ -18,22 +18,13 @@
     "developer",
     "wpm",
     "accuracy",
-    "c++",
     "python",
-    "javascript",
-    "java",
-    "professional"
+    "c++",
+    "go",
+    "dsa"
   ],
-  "author": "typeMyCode Team",
+  "author": "typeMyCode",
   "license": "MIT",
-  "homepage": "https://github.com/yourusername/typemycode",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/yourusername/typemycode.git"
-  },
-  "bugs": {
-    "url": "https://github.com/yourusername/typemycode/issues"
-  },
   "engines": {
     "node": ">=14.0.0"
   },

@@ -15,6 +15,7 @@ class TypingSpeedApp {
         this.skippedCharacters = 0; // Count of characters skipped via button
         this.manuallyTypedCharacters = 0; // Count of characters manually typed
         this.correctManualCharacters = 0; // Count of correctly manually typed characters
+        this.syntaxMap = []; // Character index to syntax token mapping
         
         this.initializeElements();
         this.bindEvents();
@@ -27,12 +28,16 @@ class TypingSpeedApp {
             const container = document.createElement('div');
             container.id = 'notificationContainer';
             container.className = 'notification-container';
+            container.setAttribute('role', 'status');
+            container.setAttribute('aria-live', 'polite');
             document.body.appendChild(container);
         }
     }
 
     showNotification(message, type = 'info', duration = 4000) {
         const container = document.getElementById('notificationContainer');
+        if (!container) return null;
+
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         
@@ -40,14 +45,27 @@ class TypingSpeedApp {
                     type === 'error' ? '❌' : 
                     type === 'warning' ? '⚠️' : 'ℹ️';
         
-        notification.innerHTML = `
-            <div class="notification-content">
-                <span class="notification-icon">${icon}</span>
-                <span class="notification-message">${message}</span>
-                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
-            </div>
-        `;
-        
+        const content = document.createElement('div');
+        content.className = 'notification-content';
+
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'notification-icon';
+        iconSpan.textContent = icon;
+
+        const msgSpan = document.createElement('span');
+        msgSpan.className = 'notification-message';
+        msgSpan.textContent = message;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'notification-close';
+        closeBtn.textContent = '×';
+        closeBtn.setAttribute('aria-label', 'Dismiss notification');
+        closeBtn.addEventListener('click', () => notification.remove());
+
+        content.appendChild(iconSpan);
+        content.appendChild(msgSpan);
+        content.appendChild(closeBtn);
+        notification.appendChild(content);
         container.appendChild(notification);
         
         // Auto-remove after duration
@@ -66,21 +84,27 @@ class TypingSpeedApp {
     }
 
     showCompletionModal(stats) {
-        // Create modal overlay
+        // Remove existing overlay if present
+        const existing = document.querySelector('.completion-modal-overlay');
+        if (existing) existing.remove();
+
         const modalOverlay = document.createElement('div');
         modalOverlay.className = 'completion-modal-overlay';
         
         const modal = document.createElement('div');
         modal.className = 'completion-modal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'completionTitle');
         
         modal.innerHTML = `
             <div class="completion-header">
-                <h2>🎉 Congratulations!</h2>
-                <button class="completion-close" onclick="this.closest('.completion-modal-overlay').remove()">×</button>
+                <h2 id="completionTitle">🎉 Congratulations!</h2>
+                <button class="completion-close" id="modalCloseBtn" aria-label="Close dialog">×</button>
             </div>
             <div class="completion-content">
                 <div class="completion-message">
-                    <p>You've successfully completed the typing practice!</p>
+                    <p>Practice complete! Ready to tackle your next DSA problem?</p>
                 </div>
                 <div class="completion-stats">
                     <div class="stat-item">
@@ -97,30 +121,50 @@ class TypingSpeedApp {
                     </div>
                 </div>
                 <div class="completion-actions">
-                    <button class="btn btn-primary btn-medium" onclick="this.closest('.completion-modal-overlay').remove(); app.resetTyping();">Try Again</button>
-                    <button class="btn btn-outline btn-medium" onclick="this.closest('.completion-modal-overlay').remove(); app.goBackToTextInput();">New Text</button>
+                    <button class="btn btn-primary btn-medium" id="modalTryAgainBtn">Try Again (Enter)</button>
+                    <button class="btn btn-outline btn-medium" id="modalNewTextBtn">New Problem (Esc)</button>
                 </div>
             </div>
         `;
         
         modalOverlay.appendChild(modal);
         document.body.appendChild(modalOverlay);
+
+        const closeModal = () => {
+            modalOverlay.remove();
+            document.removeEventListener('keydown', handleModalKeys);
+        };
+
+        const tryAgain = () => {
+            closeModal();
+            this.resetTyping();
+        };
+
+        const newProblem = () => {
+            closeModal();
+            this.goBackToTextInput();
+        };
+
+        modal.querySelector('#modalCloseBtn')?.addEventListener('click', closeModal);
+        modal.querySelector('#modalTryAgainBtn')?.addEventListener('click', tryAgain);
+        modal.querySelector('#modalNewTextBtn')?.addEventListener('click', newProblem);
         
         // Close on overlay click
         modalOverlay.addEventListener('click', (e) => {
             if (e.target === modalOverlay) {
-                modalOverlay.remove();
+                closeModal();
             }
         });
         
-        // Close on Escape key
-        const handleEscape = (e) => {
+        // Keyboard shortcuts inside modal
+        const handleModalKeys = (e) => {
             if (e.key === 'Escape') {
-                modalOverlay.remove();
-                document.removeEventListener('keydown', handleEscape);
+                newProblem();
+            } else if (e.key === 'Enter') {
+                tryAgain();
             }
         };
-        document.addEventListener('keydown', handleEscape);
+        document.addEventListener('keydown', handleModalKeys);
     }
 
     initializeElements() {
@@ -170,19 +214,27 @@ class TypingSpeedApp {
             this.modalOverlay.addEventListener('click', () => this.closeModalHandler());
         }
         
-        // Existing events
-        this.startButton.addEventListener('click', () => this.startTypingPractice());
-        this.backButton.addEventListener('click', () => this.goBackToTextInput());
-        this.resetButton.addEventListener('click', () => this.resetTyping());
-        this.textDisplay.addEventListener('keydown', (e) => this.handleKeydown(e));
-        this.textDisplay.addEventListener('click', () => this.textDisplay.focus());
+        // Core buttons with safe checks
+        if (this.startButton) {
+            this.startButton.addEventListener('click', () => this.startTypingPractice());
+        }
+        if (this.backButton) {
+            this.backButton.addEventListener('click', () => this.goBackToTextInput());
+        }
+        if (this.resetButton) {
+            this.resetButton.addEventListener('click', () => this.resetTyping());
+        }
+        if (this.textDisplay) {
+            this.textDisplay.addEventListener('keydown', (e) => this.handleKeydown(e));
+            this.textDisplay.addEventListener('click', () => this.textDisplay.focus());
+        }
         
-        // Add sample button event if it exists
+        // Sample button event
         if (this.sampleButton) {
             this.sampleButton.addEventListener('click', () => this.loadSampleCode());
         }
 
-        // ESC key to close modal
+        // ESC key to close setup modal
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.practiceSetupModal && !this.practiceSetupModal.classList.contains('hidden')) {
                 this.closeModalHandler();
@@ -201,6 +253,16 @@ class TypingSpeedApp {
                 this.positionSkipButton();
             }
         });
+
+        // Code area scroll listener
+        const codeArea = document.querySelector('.code-area');
+        if (codeArea) {
+            codeArea.addEventListener('scroll', () => {
+                if (this.skipButton && this.skipButton.style.display !== 'none') {
+                    this.positionSkipButton();
+                }
+            });
+        }
     }
 
     openModal() {
@@ -220,15 +282,17 @@ class TypingSpeedApp {
     }
 
     startTypingPractice() {
-        const text = this.practiceTextArea.value.trim();
+        const rawText = this.practiceTextArea ? this.practiceTextArea.value : '';
+        // Normalize CRLF and CR line endings to LF
+        const normalizedText = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
         
-        if (!text) {
+        if (!normalizedText) {
             this.showNotification('Please enter some text to practice!', 'warning');
             return;
         }
 
         // Strip lines that contain only spaces (but keep truly empty lines and lines with content)
-        const cleanedText = this.stripSpaceOnlyLines(text);
+        const cleanedText = this.stripSpaceOnlyLines(normalizedText);
         
         if (!cleanedText.trim()) {
             this.showNotification('No content found after removing empty lines!', 'warning');
@@ -236,6 +300,10 @@ class TypingSpeedApp {
         }
 
         this.practiceText = cleanedText;
+        
+        // Reset timer state for a fresh session
+        this.stopTimer();
+        this.startTime = null;
         
         // Close modal
         this.closeModalHandler();
@@ -255,15 +323,12 @@ class TypingSpeedApp {
             const line = lines[i];
             
             // Keep line if:
-            // 1. It has actual content (non-whitespace)
-            // 2. It's completely empty (intentional blank line)
-            // Remove only if it has spaces/tabs but no content
-            
+            // 1. It has actual non-whitespace content
+            // 2. It is completely empty (intentional blank line)
+            // Discard lines that contain only spaces/tabs
             if (line.length === 0 || line.trim().length > 0) {
-                // Keep empty lines and lines with content
                 cleanedLines.push(line);
             }
-            // Skip lines that are only spaces/tabs (line.length > 0 && line.trim().length === 0)
         }
         
         return cleanedLines.join('\n');
@@ -272,47 +337,31 @@ class TypingSpeedApp {
     updateFileDisplayName() {
         const fileNameDisplay = document.getElementById('fileName');
         if (fileNameDisplay) {
-            const language = this.languageSelect.value;
+            const language = this.languageSelect ? this.languageSelect.value : 'auto';
             let extension = '.txt';
             
-            switch (language) {
-                case 'cpp':
-                    extension = '.cpp';
-                    break;
+            let detectedLang = language;
+            if (language === 'auto') {
+                detectedLang = this.detectLanguage(this.practiceText);
+            }
+            
+            switch (detectedLang) {
                 case 'python':
                     extension = '.py';
                     break;
-                case 'javascript':
-                    extension = '.js';
+                case 'cpp':
+                    extension = '.cpp';
                     break;
-                case 'java':
-                    extension = '.java';
+                case 'go':
+                    extension = '.go';
                     break;
-                case 'auto':
-                    // Auto-detect based on content
-                    const detectedLang = this.detectLanguage(this.practiceText);
-                    switch (detectedLang) {
-                        case 'cpp':
-                            extension = '.cpp';
-                            break;
-                        case 'python':
-                            extension = '.py';
-                            break;
-                        case 'javascript':
-                            extension = '.js';
-                            break;
-                        case 'java':
-                            extension = '.java';
-                            break;
-                        default:
-                            extension = '.txt';
-                    }
-                    break;
+                case 'plain':
                 default:
                     extension = '.txt';
+                    break;
             }
             
-            fileNameDisplay.textContent = `practice${extension}`;
+            fileNameDisplay.textContent = `solution${extension}`;
         }
     }
 
@@ -324,6 +373,14 @@ class TypingSpeedApp {
         
         // Detect and mark comment positions and leading whitespace
         this.detectComments();
+        
+        // Build syntax map for dynamic syntax highlighting
+        const language = this.languageSelect ? this.languageSelect.value : 'auto';
+        let detectedLang = language;
+        if (language === 'auto') {
+            detectedLang = this.detectLanguage(this.practiceText);
+        }
+        this.syntaxMap = this.buildSyntaxMap(this.practiceText, detectedLang);
         
         this.practiceText.split('').forEach((char, index) => {
             const span = document.createElement('span');
@@ -357,20 +414,6 @@ class TypingSpeedApp {
         this.textDisplay.focus();
     }
     
-    isLeadingWhitespace(index) {
-        // Check if this index is part of leading whitespace on a line
-        const textUpToIndex = this.practiceText.substring(0, index + 1);
-        const lines = textUpToIndex.split('\n');
-        const currentLine = lines[lines.length - 1];
-        const charInCurrentLine = currentLine.length - 1;
-        
-        // Check if we're still in the leading whitespace part of the line
-        const leadingWhitespaceMatch = this.practiceText.split('\n')[lines.length - 1]?.match(/^[\s\t]*/);
-        const leadingWhitespaceLength = leadingWhitespaceMatch ? leadingWhitespaceMatch[0].length : 0;
-        
-        return charInCurrentLine < leadingWhitespaceLength && /[\s\t]/.test(this.practiceText[index]);
-    }
-    
     generateLineNumbers() {
         const lines = this.practiceText.split('\n');
         this.lineNumbers.innerHTML = '';
@@ -398,7 +441,10 @@ class TypingSpeedApp {
         document.getElementById('typingSection').classList.add('hidden');
         document.getElementById('textInputSection').classList.remove('hidden');
         this.stopTimer();
-        this.practiceTextArea.focus();
+        this.startTime = null;
+        if (this.practiceTextArea) {
+            this.practiceTextArea.focus();
+        }
         
         // Clean up skip button
         if (this.skipButton) {
@@ -409,7 +455,7 @@ class TypingSpeedApp {
 
     detectComments() {
         const text = this.practiceText;
-        const language = this.languageSelect.value;
+        const language = this.languageSelect ? this.languageSelect.value : 'auto';
         const commentRanges = [];
         const lines = text.split('\n');
         
@@ -423,8 +469,7 @@ class TypingSpeedApp {
         
         switch (detectedLang) {
             case 'cpp':
-            case 'javascript':
-            case 'java':
+            case 'go':
                 // Single-line comments: //
                 const cppSingleLineRegex = /\/\/.*?$/gm;
                 while ((match = cppSingleLineRegex.exec(text)) !== null) {
@@ -477,26 +522,22 @@ class TypingSpeedApp {
             }
         });
         
-        // Enhanced feature: Skip entire lines that are comment-only or start with comments
+        // Skip entire lines that are comment-only or start with comments
         let currentIndex = 0;
-        lines.forEach((line, lineNum) => {
+        lines.forEach((line) => {
             let isCommentLine = false;
-            const trimmedLine = line.trim();
             
             switch (detectedLang) {
                 case 'cpp':
-                case 'javascript':
-                case 'java':
+                case 'go':
                     // Skip entire line if it starts with // or /* (after any whitespace)
                     if (/^\s*(\/\/|\/\*)/.test(line)) {
                         isCommentLine = true;
                     }
                     break;
                 case 'python':
-                    // Skip entire line if it starts with # (after any whitespace)
-                    // Also check for docstring lines (lines that only contain """ or ''')
-                    if (/^\s*#/.test(line) || /^\s*(""".*"""|\'''.*\'\'')?\s*$/.test(line) || 
-                        /^\s*("""|''')/.test(line)) {
+                    // Skip entire line if it starts with # or docstring delimiter
+                    if (/^\s*#/.test(line) || /^\s*("""|''')/.test(line)) {
                         isCommentLine = true;
                     }
                     break;
@@ -512,7 +553,7 @@ class TypingSpeedApp {
                     this.skipPositions.add(currentIndex + line.length);
                 }
             } else {
-                // For non-comment lines, mark leading whitespace as skippable (auto-type)
+                // For non-comment lines, mark leading whitespace as skippable (auto-bypass indentation)
                 const leadingWhitespaceMatch = line.match(/^[\s\t]*/);
                 if (leadingWhitespaceMatch && leadingWhitespaceMatch[0].length > 0) {
                     const leadingWhitespace = leadingWhitespaceMatch[0];
@@ -529,17 +570,107 @@ class TypingSpeedApp {
     }
     
     detectLanguage(text) {
-        // Simple language detection based on common patterns
-        if (text.includes('#include') || text.includes('std::') || text.includes('cout') || text.includes('//')) {
-            return 'cpp';
-        } else if (text.includes('def ') || text.includes('import ') || text.includes('print(') || text.includes('#')) {
-            return 'python';
-        } else if (text.includes('function') || text.includes('const ') || text.includes('let ') || text.includes('var ')) {
-            return 'javascript';
-        } else if (text.includes('public class') || text.includes('System.out')) {
-            return 'java';
+        let pythonScore = 0;
+        let cppScore = 0;
+        let goScore = 0;
+
+        // Go specific syntax patterns
+        if (/\bpackage\s+\w+/.test(text)) goScore += 6;
+        if (/\bfunc\s+(\([^)]+\)\s+)?\w+\s*\(/.test(text)) goScore += 5;
+        if (/\bfmt\.(Print|Println|Printf|Sprintf|Errorf)/.test(text)) goScore += 4;
+        if (/:=/.test(text)) goScore += 3;
+        if (/\bimport\s*\([\s\S]*?\)/.test(text)) goScore += 4;
+        if (/\bchan\b|\bgo\s+\w+\(/.test(text)) goScore += 3;
+        if (/\btype\s+\w+\s+struct\b/.test(text)) goScore += 4;
+        if (/\bmake\s*\(/.test(text)) goScore += 2;
+
+        // C++ specific syntax patterns
+        if (/#include\s*<[\w.]+>/.test(text)) cppScore += 6;
+        if (/\bstd::/.test(text)) cppScore += 5;
+        if (/\b(cout|cin)\s*(<<|>>)/.test(text)) cppScore += 4;
+        if (/\bvector\s*<|\bunordered_map\s*<|\bqueue\s*<|\bstack\s*</.test(text)) cppScore += 4;
+        if (/\bclass\s+Solution\b/.test(text)) cppScore += 3;
+        if (/\bnullptr\b/.test(text)) cppScore += 3;
+        if (/\btemplate\s*</.test(text)) cppScore += 3;
+
+        // Python specific syntax patterns
+        if (/\bdef\s+\w+\s*\(/.test(text)) pythonScore += 6;
+        if (/\belif\b/.test(text)) pythonScore += 5;
+        if (/\bself\.\w+/.test(text)) pythonScore += 4;
+        if (/("""[\s\S]*?"""|'''[\s\S]*?''')/.test(text)) pythonScore += 4;
+        if (/\bimport\s+\w+|\bfrom\s+\w+\s+import/.test(text)) pythonScore += 4;
+        if (/\bprint\s*\(/.test(text)) pythonScore += 2;
+        if (/\blambda\b|\bin\s+range\s*\(/.test(text)) pythonScore += 3;
+        if (/\bif\s+__name__\s*==\s*['"]__main__['"]/.test(text)) pythonScore += 5;
+
+        // If no distinctive patterns match, fallback to plain text
+        if (goScore === 0 && cppScore === 0 && pythonScore === 0) {
+            return 'plain';
         }
-        return 'plain';
+
+        if (goScore >= cppScore && goScore >= pythonScore) return 'go';
+        if (cppScore >= pythonScore) return 'cpp';
+        return 'python';
+    }
+    
+    buildSyntaxMap(text, language) {
+        const syntaxMap = new Array(text.length).fill(null);
+        if (typeof Prism === 'undefined' || !Prism.languages) {
+            return syntaxMap;
+        }
+        
+        const grammar = Prism.languages[language] || Prism.languages.plain;
+        if (!grammar) {
+            return syntaxMap;
+        }
+
+        try {
+            const tokens = Prism.tokenize(text, grammar);
+            let offset = 0;
+
+            const walk = (tokenList, parentType = null) => {
+                for (const token of tokenList) {
+                    if (typeof token === 'string') {
+                        if (parentType) {
+                            for (let j = 0; j < token.length; j++) {
+                                if (offset + j < text.length) {
+                                    syntaxMap[offset + j] = parentType;
+                                }
+                            }
+                        }
+                        offset += token.length;
+                    } else if (token && typeof token === 'object') {
+                        const tokenType = token.type || parentType;
+                        if (typeof token.content === 'string') {
+                            for (let j = 0; j < token.content.length; j++) {
+                                if (offset + j < text.length) {
+                                    syntaxMap[offset + j] = tokenType;
+                                }
+                            }
+                            offset += token.content.length;
+                        } else if (Array.isArray(token.content)) {
+                            walk(token.content, tokenType);
+                        } else if (token.content && typeof token.content === 'object') {
+                            walk([token.content], tokenType);
+                        } else {
+                            const str = String(token.content || '');
+                            for (let j = 0; j < str.length; j++) {
+                                if (offset + j < text.length) {
+                                    syntaxMap[offset + j] = tokenType;
+                                }
+                            }
+                            offset += str.length;
+                        }
+                    }
+                }
+            };
+
+            walk(tokens);
+        } catch (e) {
+            console.warn('Syntax highlighting mapping failed:', e);
+        }
+
+        return syntaxMap;
     }
     
     findNextTypablePosition(startPos) {
@@ -606,11 +737,13 @@ class TypingSpeedApp {
         
         this.skipButton = document.createElement('button');
         this.skipButton.className = 'skip-line-button';
+        this.skipButton.setAttribute('type', 'button');
         this.skipButton.innerHTML = `
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                 <path d="M8 2L14 8L8 14M14 8H2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Skip this line
+            <span>Skip line</span>
+            <kbd class="skip-key-badge">Tab</kbd>
         `;
         this.skipButton.addEventListener('click', (e) => {
             e.preventDefault();
@@ -618,7 +751,7 @@ class TypingSpeedApp {
             this.skipCurrentLine();
         });
         
-        // Prevent the button from taking focus
+        // Prevent button from taking focus away from editor
         this.skipButton.addEventListener('mousedown', (e) => {
             e.preventDefault();
         });
@@ -628,24 +761,29 @@ class TypingSpeedApp {
     }
     
     updateSkipButton() {
-        // Check if we're in the middle of typing a line (not at the start)
-        const isTypingLine = this.currentPosition > this.currentLineStartPos;
-        
-        // Check if the current line has non-comment content to type
-        let hasTypableContent = false;
-        for (let i = this.currentLineStartPos; i < this.currentLineEndPos; i++) {
+        if (this.currentPosition >= this.practiceText.length) {
+            if (this.skipButton) {
+                this.skipButton.style.display = 'none';
+            }
+            return;
+        }
+
+        // Check if there is remaining typable content on the current line
+        let hasRemainingContent = false;
+        for (let i = this.currentPosition; i < this.currentLineEndPos; i++) {
             if (!this.skipPositions.has(i)) {
-                hasTypableContent = true;
+                hasRemainingContent = true;
                 break;
             }
         }
         
-        if (isTypingLine && hasTypableContent && this.currentPosition < this.practiceText.length) {
+        // Show button whenever cursor is on a line with typable content
+        if (hasRemainingContent) {
             if (!this.skipButton) {
                 this.createSkipButton();
             }
             this.positionSkipButton();
-            this.skipButton.style.display = 'flex';
+            this.skipButton.style.display = 'inline-flex';
         } else {
             if (this.skipButton) {
                 this.skipButton.style.display = 'none';
@@ -656,16 +794,22 @@ class TypingSpeedApp {
     positionSkipButton() {
         if (!this.skipButton) return;
         
-        const chars = this.textDisplay.children;
-        if (this.currentLineEndPos - 1 >= 0 && this.currentLineEndPos - 1 < chars.length) {
-            const lastCharInLine = chars[this.currentLineEndPos - 1];
-            const rect = lastCharInLine.getBoundingClientRect();
-            const editorBodyRect = this.textDisplay.closest('.editor-body').getBoundingClientRect();
+        const chars = this.textDisplay?.children;
+        if (!chars || chars.length === 0) return;
+
+        const targetIndex = Math.min(Math.max(0, this.currentLineEndPos - 1), chars.length - 1);
+        const charElem = chars[targetIndex];
+        if (charElem) {
+            const rect = charElem.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
             
-            // Position the button to the right of the last character in the line
-            // relative to the editor body
+            let leftPos = rect.right + 12;
+            if (leftPos + 130 > viewportWidth) {
+                leftPos = Math.max(10, viewportWidth - 140);
+            }
+
             this.skipButton.style.position = 'fixed';
-            this.skipButton.style.left = `${rect.right + 10}px`;
+            this.skipButton.style.left = `${leftPos}px`;
             this.skipButton.style.top = `${rect.top}px`;
             this.skipButton.style.zIndex = '1000';
         }
@@ -679,15 +823,12 @@ class TypingSpeedApp {
         // Add each character from current position to end of line exactly as it appears
         for (let i = this.currentPosition; i < this.currentLineEndPos; i++) {
             if (!this.skipPositions.has(i)) {
-                // Add the exact character from practice text
                 this.typedText += this.practiceText[i];
                 skippedCount++;
-                // Since we're adding the exact character, it's always correct
                 this.correctCharacters++;
             }
         }
         
-        // Track skipped characters for statistics (don't count toward manual typing)
         this.skippedCharacters += skippedCount;
         
         // Move position to end of current line
@@ -714,10 +855,12 @@ class TypingSpeedApp {
         }
         
         setTimeout(() => {
-            this.textDisplay.focus();
+            if (this.textDisplay) {
+                this.textDisplay.focus();
+            }
         }, 10);
         
-        this.showNotification(`Line skipped (${skippedCount} characters)`, 'success', 2000);
+        this.showNotification(`Line skipped (${skippedCount} characters)`, 'info', 1500);
         
         // Check completion
         if (this.currentPosition >= this.practiceText.length) {
@@ -729,7 +872,9 @@ class TypingSpeedApp {
         this.setupTypingInterface();
         this.stopTimer();
         this.startTime = null;
-        this.textDisplay.focus();
+        if (this.textDisplay) {
+            this.textDisplay.focus();
+        }
         
         // Clean up skip button
         if (this.skipButton) {
@@ -739,8 +884,19 @@ class TypingSpeedApp {
     }
 
     handleKeydown(e) {
-        // Prevent default behavior for most keys to handle them manually
-        if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Tab') {
+        // Tab shortcut: skip remainder of current line
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            if (!this.startTime) {
+                this.startTime = Date.now();
+                this.startTimer();
+            }
+            this.skipCurrentLine();
+            return;
+        }
+
+        // Standard typing keys
+        if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter') {
             e.preventDefault();
             
             if (!this.startTime && (e.key.length === 1 || e.key === 'Enter')) {
@@ -752,9 +908,8 @@ class TypingSpeedApp {
                 this.handleBackspace();
             } else if (e.key === 'Enter') {
                 this.handleEnterKey();
-            } else if (e.key.length === 1 || e.key === 'Tab') {
-                const char = e.key === 'Tab' ? '\t' : e.key;
-                this.handleCharacterInput(char);
+            } else if (e.key.length === 1) {
+                this.handleCharacterInput(e.key);
             }
             
             this.updateDisplay();
@@ -796,7 +951,6 @@ class TypingSpeedApp {
                 this.correctCharacters++;
                 this.correctManualCharacters++;
             }
-            // Note: We don't mark as incorrect here, we just don't increment correct counters
             
             // Always move to next typable position, regardless of correctness
             this.currentPosition = this.findNextTypablePosition(this.currentPosition + 1);
@@ -841,21 +995,29 @@ class TypingSpeedApp {
             char.className = 'char';
             
             if (this.skipPositions.has(i)) {
-                // This is a comment or skipped position
-                char.classList.add('comment', 'skipped');
+                // Check if this is leading whitespace or a comment
+                if (this.leadingWhitespacePositions.has(i)) {
+                    char.classList.add('leading-whitespace', 'skipped');
+                } else {
+                    char.classList.add('comment', 'skipped');
+                }
             } else if (i < this.currentPosition) {
                 // This position has been passed
                 if (typedIndex < this.typedText.length) {
-                    // Compare the typed character with the expected character
                     if (this.typedText[typedIndex] === this.practiceText[i]) {
                         char.classList.add('correct');
+                        if (this.syntaxMap && this.syntaxMap[i]) {
+                            char.classList.add(`token-${this.syntaxMap[i]}`);
+                        }
                     } else {
                         char.classList.add('incorrect');
                     }
                     typedIndex++;
                 } else {
-                    // This shouldn't happen if logic is correct, but mark as correct to be safe
                     char.classList.add('correct');
+                    if (this.syntaxMap && this.syntaxMap[i]) {
+                        char.classList.add(`token-${this.syntaxMap[i]}`);
+                    }
                 }
             } else if (i === this.currentPosition) {
                 char.classList.add('current');
@@ -880,7 +1042,7 @@ class TypingSpeedApp {
         
         const timeElapsed = (Date.now() - this.startTime) / 1000 / 60; // in minutes
         // Use only manually typed characters for WPM calculation
-        const wordsTyped = this.manuallyTypedCharacters / 5; // assuming average word length of 5
+        const wordsTyped = this.manuallyTypedCharacters / 5; // standard 5 chars per word
         const wpm = timeElapsed > 0 ? Math.round(wordsTyped / timeElapsed) : 0;
         
         // Calculate accuracy based on manually typed characters only
@@ -892,6 +1054,7 @@ class TypingSpeedApp {
     }
 
     startTimer() {
+        this.stopTimer(); // Ensure no overlapping intervals
         this.timerInterval = setInterval(() => {
             if (this.startTime) {
                 const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
@@ -910,6 +1073,8 @@ class TypingSpeedApp {
     }
 
     resetStats() {
+        this.stopTimer();
+        this.startTime = null;
         this.wpmDisplay.textContent = '0';
         this.accuracyDisplay.textContent = '100%';
         this.timerDisplay.textContent = '00:00';
@@ -924,72 +1089,75 @@ class TypingSpeedApp {
     
     loadSampleCode() {
         const sampleTexts = [
-            // C++ Example
-            `#include <iostream>
-#include <vector>
+            // Python DSA: Two Sum (Hash Map)
+            `def two_sum(nums, target):
+    """
+    Find indices of two numbers that add up to target.
+    Time Complexity: O(n), Space Complexity: O(n)
+    """
+    seen = {}
+    for i, num in enumerate(nums):
+        complement = target - num
+        if complement in seen:
+            return [seen[complement], i]
+        seen[num] = i
+    return []`,
+
+            // C++ DSA: Binary Search
+            `#include <vector>
 using namespace std;
 
-int main() {
-    // This is a comment that won't be typed
-    vector<int> numbers = {1, 2, 3, 4, 5};
-    
-    /* Multi-line comment
-       that spans multiple lines */
-    for (int num : numbers) {
-        cout << "Number: " << num << endl;
-    }
-    
-    return 0;
-}`,
-            
-            // Python Example
-            `def fibonacci(n):
-    """
-    Calculate the nth Fibonacci number
-    This docstring won't be typed
-    """
-    # Base cases - this comment is skipped
-    if n <= 1:
-        return n
-    
-    # Recursive case
-    return fibonacci(n-1) + fibonacci(n-2)
-
-# Main execution
-if __name__ == "__main__":
-    for i in range(10):
-        print(f"F({i}) = {fibonacci(i)}")`,
+class Solution {
+public:
+    // Binary Search - Find target index in sorted array
+    // Time Complexity: O(log n), Space: O(1)
+    int search(vector<int>& nums, int target) {
+        int left = 0;
+        int right = nums.size() - 1;
         
-        // JavaScript Example
-        `function quickSort(arr) {
-            // Base case: arrays with 0 or 1 element are sorted
-            if (arr.length <= 1) {
-                return arr;
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            if (nums[mid] == target) {
+                return mid;
+            } else if (nums[mid] < target) {
+                left = mid + 1;
+            } else {
+                right = mid - 1;
             }
-            
-            /* Choose pivot and partition array */
-            const pivot = arr[Math.floor(arr.length / 2)];
-            const left = arr.filter(x => x < pivot);
-            const middle = arr.filter(x => x === pivot);
-            const right = arr.filter(x => x > pivot);
-            
-            // Recursively sort and combine
-            return [...quickSort(left), ...middle, ...quickSort(right)];
-        }`
+        }
+        return -1;
+    }
+};`,
+
+            // Go DSA: Binary Search
+            `package main
+
+// BinarySearch finds target index in sorted slice
+// Time: O(log n), Space: O(1)
+func BinarySearch(nums []int, target int) int {
+	left, right := 0, len(nums)-1
+
+	for left <= right {
+		mid := left + (right-left)/2
+		if nums[mid] == target {
+			return mid
+		} else if nums[mid] < target {
+			left = mid + 1
+		} else {
+			right = mid - 1
+		}
+	}
+	return -1
+}`
         ];
         
         const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
         this.practiceTextArea.value = randomText;
         
         // Auto-set language based on sample
-        if (randomText.includes('#include')) {
-            this.languageSelect.value = 'cpp';
-        } else if (randomText.includes('def ') && randomText.includes('"""')) {
-            this.languageSelect.value = 'python';
-        } else if (randomText.includes('function') && randomText.includes('const')) {
-            this.languageSelect.value = 'javascript';
-        } else {
-            this.languageSelect.value = 'auto';
+        const detected = this.detectLanguage(randomText);
+        if (this.languageSelect) {
+            this.languageSelect.value = detected;
         }
     }
 
