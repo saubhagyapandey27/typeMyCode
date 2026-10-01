@@ -1264,6 +1264,9 @@ body {
   color: var(--gray-900);
   resize: vertical;
   transition: all 150ms var(--ease-out);
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
+  -webkit-font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
 }
 
 #practiceText:focus {
@@ -1398,6 +1401,21 @@ body {
   background: var(--orange-500);
 }
 
+/* Disable programming ligatures across all code displays and editors */
+.editor,
+.editor-body,
+.code-area,
+.code-display,
+.char,
+#practiceText,
+pre,
+code {
+  font-variant-ligatures: none;
+  -webkit-font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
+  -webkit-font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
+}
+
 .editor-body {
   display: flex;
   min-height: 400px;
@@ -1432,12 +1450,20 @@ body {
   outline: none;
   cursor: text;
   min-height: 400px;
+  font-variant-ligatures: none;
+  -webkit-font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
+  -webkit-font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
 }
 
 /* ===== CHARACTER STYLES ===== */
 .char {
   position: relative;
   transition: all 100ms var(--ease-out);
+  font-variant-ligatures: none;
+  -webkit-font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
+  -webkit-font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
 }
 
 .char.correct {

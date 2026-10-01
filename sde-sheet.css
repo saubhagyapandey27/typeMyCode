@@ -746,7 +746,8 @@
   background: var(--dark-editor-bg);
 }
 
-.code-viewport pre {
+.code-viewport pre,
+.code-viewport code {
   margin: 0;
   font-family: var(--font-mono);
   font-size: 0.84rem;
@@ -754,6 +755,10 @@
   color: #f1f5f9;
   white-space: pre;
   tab-size: 4;
+  font-variant-ligatures: none;
+  -webkit-font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
+  -webkit-font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
 }
 
 .code-editor-footer {
