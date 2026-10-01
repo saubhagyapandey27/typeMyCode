@@ -8,6 +8,7 @@ class TypingSpeedApp {
         this.correctCharacters = 0;
         this.skipPositions = new Set(); // Positions to skip (comments)
         this.leadingWhitespacePositions = new Set(); // Positions that are leading whitespace
+        this.optionalSpacePositions = new Set(); // Positions where space is syntactically optional
         this.currentPosition = 0;
         this.skipButton = null; // Reference to the skip button
         this.currentLineStartPos = 0; // Start position of current line
@@ -16,6 +17,8 @@ class TypingSpeedApp {
         this.manuallyTypedCharacters = 0; // Count of characters manually typed
         this.correctManualCharacters = 0; // Count of correctly manually typed characters
         this.syntaxMap = []; // Character index to syntax token mapping
+        this.charStatus = []; // Status of each character: null, 'correct', 'incorrect', 'space-ignored'
+        this.inputHistory = []; // Stack of typed actions for robust Backspace handling
         this.currentSdeProblem = null;
         
         this.initializeElements();
@@ -421,6 +424,7 @@ class TypingSpeedApp {
         this.textDisplay.innerHTML = '';
         this.skipPositions.clear();
         this.leadingWhitespacePositions.clear();
+        this.optionalSpacePositions.clear();
         this.currentPosition = 0;
         
         // Detect and mark comment positions and leading whitespace
@@ -433,6 +437,11 @@ class TypingSpeedApp {
             detectedLang = this.detectLanguage(this.practiceText);
         }
         this.syntaxMap = this.buildSyntaxMap(this.practiceText, detectedLang);
+
+        // Detect syntactically optional spaces in the code
+        this.optionalSpacePositions = this.detectOptionalSpaces(this.practiceText, detectedLang);
+        this.charStatus = new Array(this.practiceText.length).fill(null);
+        this.inputHistory = [];
         
         this.practiceText.split('').forEach((char, index) => {
             const span = document.createElement('span');
@@ -627,7 +636,121 @@ class TypingSpeedApp {
             currentIndex += line.length + 1;
         });
     }
-    
+
+    detectOptionalSpaces(text, detectedLang) {
+        const optionalSpaces = new Set();
+        const len = text.length;
+
+        // 1. Identify string ranges to protect spaces inside string literals
+        const stringRanges = [];
+        if (detectedLang === 'python') {
+            const tripleQuoteRegex = /("""[\s\S]*?"""|'''[\s\S]*?''')/g;
+            let tqMatch;
+            while ((tqMatch = tripleQuoteRegex.exec(text)) !== null) {
+                stringRanges.push({ start: tqMatch.index, end: tqMatch.index + tqMatch[0].length - 1 });
+            }
+        }
+        
+        const isInsideRanges = (pos, ranges) => ranges.some(r => pos >= r.start && pos <= r.end);
+
+        for (let i = 0; i < len; i++) {
+            if (this.skipPositions && this.skipPositions.has(i)) continue;
+            if (isInsideRanges(i, stringRanges)) continue;
+
+            const c = text[i];
+            if (c === '"' || c === "'" || (c === '`' && detectedLang === 'go')) {
+                const quote = c;
+                const start = i;
+                i++;
+                while (i < len) {
+                    if (text[i] === '\\') {
+                        i += 2;
+                        continue;
+                    }
+                    if (text[i] === quote) break;
+                    if (text[i] === '\n' && quote !== '`') break;
+                    i++;
+                }
+                stringRanges.push({ start, end: Math.min(i, len - 1) });
+            }
+        }
+
+        const isInsideString = (pos) => isInsideRanges(pos, stringRanges);
+
+        // 2. Scan for spaces in text
+        let i = 0;
+        while (i < len) {
+            if (text[i] === ' ' || text[i] === '\t') {
+                const spaceStart = i;
+                while (i < len && (text[i] === ' ' || text[i] === '\t')) {
+                    i++;
+                }
+                const spaceEnd = i;
+
+                let allAlreadySkipped = true;
+                for (let s = spaceStart; s < spaceEnd; s++) {
+                    if (!this.skipPositions || !this.skipPositions.has(s)) {
+                        allAlreadySkipped = false;
+                        break;
+                    }
+                }
+                if (allAlreadySkipped) continue;
+
+                if (isInsideString(spaceStart)) continue;
+
+                let prevChar = spaceStart > 0 ? text[spaceStart - 1] : null;
+                let nextChar = spaceEnd < len ? text[spaceEnd] : null;
+
+                // Trailing spaces before newline or EOF are optional
+                if (nextChar === '\n' || nextChar === null) {
+                    for (let s = spaceStart; s < spaceEnd; s++) optionalSpaces.add(s);
+                    continue;
+                }
+
+                if (prevChar === '\n' || prevChar === null) {
+                    continue;
+                }
+
+                const isWord = (ch) => ch && /[a-zA-Z0-9_]/.test(ch);
+
+                // Space between two word tokens is REQUIRED (e.g. "int a", "return 0")
+                if (isWord(prevChar) && isWord(nextChar)) {
+                    continue;
+                }
+
+                // Operator characters that would merge (e.g. '+' and '+')
+                if (prevChar === nextChar && /[+\-/<>=*&|]/.test(prevChar)) {
+                    continue;
+                }
+
+                for (let s = spaceStart; s < spaceEnd; s++) {
+                    optionalSpaces.add(s);
+                }
+            } else {
+                i++;
+            }
+        }
+
+        return optionalSpaces;
+    }
+
+    isHarmlessExtraSpace(pos) {
+        if (pos >= this.practiceText.length) return false;
+        const currChar = this.practiceText[pos];
+        const prevChar = pos > 0 ? this.practiceText[pos - 1] : null;
+
+        // Space after comma, semicolon, colon
+        if (prevChar === ',' || prevChar === ';' || prevChar === ':') return true;
+
+        // Space before operator or punctuation
+        if (/^[=+\-*/%<>!&|^~?:;,)\]}(]/.test(currChar)) return true;
+
+        // Space after operator or open bracket
+        if (prevChar && /^[=+\-*/%<>!&|^~?([{\,]/.test(prevChar)) return true;
+
+        return false;
+    }
+
     detectLanguage(text) {
         let pythonScore = 0;
         let cppScore = 0;
@@ -878,11 +1001,14 @@ class TypingSpeedApp {
         if (this.currentPosition >= this.practiceText.length) return;
         
         let skippedCount = 0;
+        const lineSkippedPositions = [];
         
         // Add each character from current position to end of line exactly as it appears
         for (let i = this.currentPosition; i < this.currentLineEndPos; i++) {
             if (!this.skipPositions.has(i)) {
                 this.typedText += this.practiceText[i];
+                this.charStatus[i] = 'correct';
+                lineSkippedPositions.push(i);
                 skippedCount++;
                 this.correctCharacters++;
             }
@@ -896,9 +1022,16 @@ class TypingSpeedApp {
         // Handle newline if present
         if (this.currentPosition < this.practiceText.length && 
             this.practiceText[this.currentPosition] === '\n') {
+            this.charStatus[this.currentPosition] = 'correct';
             this.currentPosition++;
             this.typedText += '\n';
         }
+
+        this.inputHistory.push({
+            type: 'skipLine',
+            positions: lineSkippedPositions,
+            skippedCount: skippedCount
+        });
         
         // Find next typable position
         this.currentPosition = this.findNextTypablePosition(this.currentPosition);
@@ -922,7 +1055,18 @@ class TypingSpeedApp {
         this.showNotification(`Line skipped (${skippedCount} characters)`, 'info', 1500);
         
         // Check completion
-        if (this.currentPosition >= this.practiceText.length) {
+        let isComplete = (this.currentPosition >= this.practiceText.length);
+        if (!isComplete) {
+            let allRemainingOptional = true;
+            for (let i = this.currentPosition; i < this.practiceText.length; i++) {
+                if (!this.skipPositions.has(i) && !this.optionalSpacePositions.has(i) && this.practiceText[i] !== '\n') {
+                    allRemainingOptional = false;
+                    break;
+                }
+            }
+            if (allRemainingOptional) isComplete = true;
+        }
+        if (isComplete) {
             this.completeTyping();
         }
     }
@@ -975,80 +1119,213 @@ class TypingSpeedApp {
             this.updateStats();
             
             // Check if typing is complete
-            if (this.currentPosition >= this.practiceText.length) {
+            let isComplete = (this.currentPosition >= this.practiceText.length);
+            if (!isComplete) {
+                let allRemainingOptional = true;
+                for (let i = this.currentPosition; i < this.practiceText.length; i++) {
+                    if (!this.skipPositions.has(i) && !this.optionalSpacePositions.has(i) && this.practiceText[i] !== '\n') {
+                        allRemainingOptional = false;
+                        break;
+                    }
+                }
+                if (allRemainingOptional) isComplete = true;
+            }
+            if (isComplete) {
                 this.completeTyping();
             }
         }
     }
     
     handleEnterKey() {
-        if (this.currentPosition < this.practiceText.length && 
-            this.practiceText[this.currentPosition] === '\n') {
-            
-            // Move past the newline character
-            this.currentPosition++;
-            this.typedText += '\n';
-            this.manuallyTypedCharacters++;
-            this.correctCharacters++;
-            this.correctManualCharacters++;
-            
-            // Find next typable position (leading whitespace will be auto-skipped)
-            this.currentPosition = this.findNextTypablePosition(this.currentPosition);
-            this.updateCurrentPosition();
+        if (this.currentPosition < this.practiceText.length) {
+            let pos = this.currentPosition;
+            const skippedSpaces = [];
+            while (pos < this.practiceText.length && (this.practiceText[pos] === ' ' || this.practiceText[pos] === '\t')) {
+                if (this.optionalSpacePositions.has(pos)) {
+                    skippedSpaces.push(pos);
+                }
+                pos++;
+            }
+
+            if (pos < this.practiceText.length && this.practiceText[pos] === '\n') {
+                // Bypass trailing optional spaces
+                skippedSpaces.forEach(s => {
+                    this.charStatus[s] = 'space-ignored';
+                });
+
+                this.charStatus[pos] = 'correct';
+                this.typedText += '\n';
+                this.manuallyTypedCharacters++;
+                this.correctCharacters++;
+                this.correctManualCharacters++;
+
+                this.inputHistory.push({
+                    type: 'enter',
+                    char: '\n',
+                    position: pos,
+                    skippedSpaces: skippedSpaces,
+                    wasCorrect: true
+                });
+
+                // Find next typable position (leading whitespace will be auto-skipped)
+                this.currentPosition = this.findNextTypablePosition(pos + 1);
+                this.updateCurrentPosition();
+            }
         }
     }
     
     handleCharacterInput(char) {
-        if (this.currentPosition < this.practiceText.length && 
-            !this.skipPositions.has(this.currentPosition)) {
-            
-            this.typedText += char;
-            this.manuallyTypedCharacters++;
-            
-            // Check if character matches
-            if (this.practiceText[this.currentPosition] === char) {
+        if (this.currentPosition >= this.practiceText.length) return;
+        if (this.skipPositions.has(this.currentPosition)) return;
+
+        const currentPos = this.currentPosition;
+        const expectedChar = this.practiceText[currentPos];
+
+        // CASE 1: Expected character is a space
+        if (expectedChar === ' ' || expectedChar === '\t') {
+            if (char === ' ') {
+                // User intentionally typed space
+                this.charStatus[currentPos] = 'correct';
+                this.typedText += char;
+                this.manuallyTypedCharacters++;
                 this.correctCharacters++;
                 this.correctManualCharacters++;
+
+                this.inputHistory.push({
+                    type: 'char',
+                    char: char,
+                    position: currentPos,
+                    skippedSpaces: [],
+                    wasCorrect: true
+                });
+
+                this.currentPosition = this.findNextTypablePosition(currentPos + 1);
+                this.updateCurrentPosition();
+                return;
             }
-            
-            // Always move to next typable position, regardless of correctness
-            this.currentPosition = this.findNextTypablePosition(this.currentPosition + 1);
-            this.updateCurrentPosition();
+
+            // User did NOT type space, but typed a non-space character
+            // Check if this space and any contiguous spaces are syntactically optional
+            if (this.optionalSpacePositions.has(currentPos)) {
+                let nextNonSpacePos = currentPos;
+                const skippedSpaces = [];
+                while (nextNonSpacePos < this.practiceText.length && 
+                       (this.practiceText[nextNonSpacePos] === ' ' || this.practiceText[nextNonSpacePos] === '\t')) {
+                    if (this.optionalSpacePositions.has(nextNonSpacePos)) {
+                        skippedSpaces.push(nextNonSpacePos);
+                    }
+                    nextNonSpacePos++;
+                }
+
+                // If all consecutive spaces leading to the target are optional:
+                if (skippedSpaces.length === (nextNonSpacePos - currentPos)) {
+                    // Mark optional spaces as space-ignored (no red!)
+                    skippedSpaces.forEach(s => {
+                        this.charStatus[s] = 'space-ignored';
+                    });
+
+                    // Evaluate user's typed char against the target character
+                    const targetChar = this.practiceText[nextNonSpacePos];
+                    const isMatch = (targetChar === char);
+
+                    this.charStatus[nextNonSpacePos] = isMatch ? 'correct' : 'incorrect';
+                    this.typedText += char;
+                    this.manuallyTypedCharacters++;
+                    if (isMatch) {
+                        this.correctCharacters++;
+                        this.correctManualCharacters++;
+                    }
+
+                    this.inputHistory.push({
+                        type: 'char',
+                        char: char,
+                        position: nextNonSpacePos,
+                        skippedSpaces: skippedSpaces,
+                        wasCorrect: isMatch
+                    });
+
+                    this.currentPosition = this.findNextTypablePosition(nextNonSpacePos + 1);
+                    this.updateCurrentPosition();
+                    return;
+                }
+            }
         }
+
+        // CASE 2: Text has no space at currentPos, but user typed Space
+        if (char === ' ') {
+            if (this.isHarmlessExtraSpace(currentPos)) {
+                // Harmless extra space: absorbed without penalty, cursor remains at currentPos
+                return;
+            }
+        }
+
+        // CASE 3: Standard character comparison
+        const isMatch = (expectedChar === char);
+        this.charStatus[currentPos] = isMatch ? 'correct' : 'incorrect';
+        this.typedText += char;
+        this.manuallyTypedCharacters++;
+        if (isMatch) {
+            this.correctCharacters++;
+            this.correctManualCharacters++;
+        }
+
+        this.inputHistory.push({
+            type: 'char',
+            char: char,
+            position: currentPos,
+            skippedSpaces: [],
+            wasCorrect: isMatch
+        });
+
+        this.currentPosition = this.findNextTypablePosition(currentPos + 1);
+        this.updateCurrentPosition();
     }
     
     handleBackspace() {
-        if (this.currentPosition > 0) {
-            // Find previous typable position
-            const prevPosition = this.findPrevTypablePosition(this.currentPosition);
-            
-            if (prevPosition >= 0) {
-                this.currentPosition = prevPosition;
-                
-                // Remove last character from typed text
-                if (this.typedText.length > 0) {
-                    const removedChar = this.typedText[this.typedText.length - 1];
-                    this.typedText = this.typedText.slice(0, -1);
-                    this.manuallyTypedCharacters = Math.max(0, this.manuallyTypedCharacters - 1);
-                    
-                    // Adjust correct characters count
-                    if (this.practiceText[this.currentPosition] === removedChar) {
-                        this.correctCharacters = Math.max(0, this.correctCharacters - 1);
-                        this.correctManualCharacters = Math.max(0, this.correctManualCharacters - 1);
-                    }
-                }
-                
-                this.updateCurrentPosition();
+        if (this.inputHistory.length === 0) return;
+
+        const lastAction = this.inputHistory.pop();
+        if (lastAction.type === 'char' || lastAction.type === 'enter') {
+            this.charStatus[lastAction.position] = null;
+            if (this.typedText.length > 0) {
+                this.typedText = this.typedText.slice(0, -1);
             }
+            this.manuallyTypedCharacters = Math.max(0, this.manuallyTypedCharacters - 1);
+            if (lastAction.wasCorrect) {
+                this.correctCharacters = Math.max(0, this.correctCharacters - 1);
+                this.correctManualCharacters = Math.max(0, this.correctManualCharacters - 1);
+            }
+
+            // Restore any skipped spaces
+            if (lastAction.skippedSpaces && lastAction.skippedSpaces.length > 0) {
+                lastAction.skippedSpaces.forEach(s => {
+                    this.charStatus[s] = null;
+                });
+                this.currentPosition = lastAction.skippedSpaces[0];
+            } else {
+                this.currentPosition = lastAction.position;
+            }
+            this.updateCurrentPosition();
+        } else if (lastAction.type === 'skipLine') {
+            lastAction.positions.forEach(pos => {
+                this.charStatus[pos] = null;
+            });
+            this.correctCharacters = Math.max(0, this.correctCharacters - lastAction.skippedCount);
+            this.skippedCharacters = Math.max(0, this.skippedCharacters - lastAction.skippedCount);
+            if (lastAction.positions.length > 0) {
+                this.currentPosition = lastAction.positions[0];
+            }
+            this.updateCurrentPosition();
         }
     }
 
     updateDisplay() {
         const chars = this.textDisplay.children;
-        let typedIndex = 0;
+        if (!chars || chars.length === 0) return;
         
         for (let i = 0; i < this.practiceText.length; i++) {
             const char = chars[i];
+            if (!char) continue;
             
             // Reset classes
             char.className = 'char';
@@ -1060,24 +1337,15 @@ class TypingSpeedApp {
                 } else {
                     char.classList.add('comment', 'skipped');
                 }
-            } else if (i < this.currentPosition) {
-                // This position has been passed
-                if (typedIndex < this.typedText.length) {
-                    if (this.typedText[typedIndex] === this.practiceText[i]) {
-                        char.classList.add('correct');
-                        if (this.syntaxMap && this.syntaxMap[i]) {
-                            char.classList.add(`token-${this.syntaxMap[i]}`);
-                        }
-                    } else {
-                        char.classList.add('incorrect');
-                    }
-                    typedIndex++;
-                } else {
-                    char.classList.add('correct');
-                    if (this.syntaxMap && this.syntaxMap[i]) {
-                        char.classList.add(`token-${this.syntaxMap[i]}`);
-                    }
+            } else if (this.charStatus[i] === 'space-ignored') {
+                char.classList.add('space-ignored');
+            } else if (this.charStatus[i] === 'correct') {
+                char.classList.add('correct');
+                if (this.syntaxMap && this.syntaxMap[i]) {
+                    char.classList.add(`token-${this.syntaxMap[i]}`);
                 }
+            } else if (this.charStatus[i] === 'incorrect') {
+                char.classList.add('incorrect');
             } else if (i === this.currentPosition) {
                 char.classList.add('current');
             } else {
@@ -1144,6 +1412,8 @@ class TypingSpeedApp {
         this.skippedCharacters = 0;
         this.manuallyTypedCharacters = 0;
         this.correctManualCharacters = 0;
+        this.charStatus = new Array(this.practiceText.length).fill(null);
+        this.inputHistory = [];
     }
     
     loadSampleCode() {

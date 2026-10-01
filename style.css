@@ -1542,6 +1542,12 @@ code {
   background: transparent;
 }
 
+.char.space-ignored {
+  color: #cbd5e1;
+  background: transparent;
+  opacity: 0.5;
+}
+
 @keyframes pulse {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0.7; }
