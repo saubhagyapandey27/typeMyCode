@@ -439,6 +439,9 @@ class TypingSpeedApp {
             span.textContent = char;
             span.className = 'char';
             span.setAttribute('data-index', index);
+            if (char === '\n') {
+                span.classList.add('char-newline');
+            }
             
             if (this.skipPositions.has(index)) {
                 // Check if this is leading whitespace or a comment
@@ -1246,10 +1249,12 @@ class TypingSpeedApp {
                 }
             } else if (this.charStatus[i] === 'incorrect') {
                 char.classList.add('incorrect');
-            } else if (i === this.currentPosition) {
-                char.classList.add('current');
             } else {
                 char.classList.add('untyped');
+            }
+
+            if (i === this.currentPosition) {
+                char.classList.add('current');
             }
         }
         

@@ -1576,7 +1576,6 @@ code {
 .char.current {
   position: relative;
   background: transparent;
-  color: inherit;
 }
 
 .char.current::before {
