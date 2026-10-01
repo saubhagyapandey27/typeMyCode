@@ -1220,6 +1220,21 @@ func BinarySearch(nums []int, target int) int {
         }
     }
 
+    cleanMath(text) {
+        if (!text) return '';
+        let s = text.trim();
+        s = s.replace(/\\mathcal\{O\}/g, 'O')
+             .replace(/\\times/g, '×')
+             .replace(/\\cdot/g, '·')
+             .replace(/\\le\b|\\leq\b/g, '≤')
+             .replace(/\\ge\b|\\geq\b/g, '≥')
+             .replace(/\\ne\b|\\neq\b/g, '≠')
+             .replace(/\\lfloor\s*/g, '⌊')
+             .replace(/\s*\\rfloor/g, '⌋')
+             .replace(/\$([^\$]+)\$/g, '$1');
+        return s;
+    }
+
     checkSdeSheetLoad() {
         const urlParams = new URLSearchParams(window.location.search);
         let sdeData = null;
@@ -1296,7 +1311,7 @@ func BinarySearch(nums []int, target int) int {
             this.sdeBannerDiff.className = `diff-badge diff-${data.difficulty.toLowerCase()}`;
         }
         if (this.sdeBannerTitle) {
-            this.sdeBannerTitle.textContent = data.title;
+            this.sdeBannerTitle.textContent = this.cleanMath(data.title);
         }
         if (this.sdeBannerPattern) {
             this.sdeBannerPattern.textContent = `Pattern ${String(data.patternId).padStart(2, '0')}: ${data.patternName}`;

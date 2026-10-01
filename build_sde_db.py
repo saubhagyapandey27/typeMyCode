@@ -67,6 +67,8 @@ def parse_markdown_files():
                     if line.startswith('###') or line.startswith('---'):
                         break
                     mantra_cleaned = line.lstrip('> ').strip()
+                    if 'Asymptotic Bounds:' in mantra_cleaned:
+                        continue
                     if mantra_cleaned:
                         mantra_lines.append(mantra_cleaned)
             mantra = '\n'.join(mantra_lines)

@@ -1,4 +1,182 @@
 // SDE Sheet Page Interactive Logic
+
+// --- HIGH-PERFORMANCE LATEX & MARKDOWN RENDERING UTILITIES ---
+function cleanLatexToUnicode(math) {
+    if (!math) return '';
+    let s = math.trim();
+    if (s.startsWith('$') && s.endsWith('$')) {
+        s = s.slice(1, -1).trim();
+    }
+    s = s.replace(/\\mathcal\{O\}/g, 'O')
+         .replace(/\\mathcal\{([A-Za-z])\}/g, '$1')
+         .replace(/\\text\{([^}]+)\}/g, '$1')
+         .replace(/\\times/g, '×')
+         .replace(/\\cdot/g, '·')
+         .replace(/\\le\b|\\leq\b/g, '≤')
+         .replace(/\\ge\b|\\geq\b/g, '≥')
+         .replace(/\\ne\b|\\neq\b/g, '≠')
+         .replace(/\\approx/g, '≈')
+         .replace(/\\infty/g, '∞')
+         .replace(/\\in\b/g, '∈')
+         .replace(/\\notin\b/g, '∉')
+         .replace(/\\leftarrow/g, '←')
+         .replace(/\\rightarrow/g, '→')
+         .replace(/\\oplus/g, '⊕')
+         .replace(/\\pmod\s*([A-Za-z0-9]+)/g, 'mod $1')
+         .replace(/\\lfloor\s*/g, '⌊')
+         .replace(/\s*\\rfloor/g, '⌋')
+         .replace(/\\lceil\s*/g, '⌈')
+         .replace(/\s*\\rceil/g, '⌉')
+         .replace(/\\log\b/g, 'log')
+         .replace(/\\Sigma/g, 'Σ')
+         .replace(/\\alpha/g, 'α')
+         .replace(/\\dots/g, '…')
+         .replace(/\\sum/g, 'Σ')
+         .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1 / $2)')
+         .replace(/\\binom\{([^}]+)\}\{([^}]+)\}/g, 'C($1, $2)')
+         .replace(/\^2\b|\^\{2\}/g, '²')
+         .replace(/\^3\b|\^\{3\}/g, '³')
+         .replace(/\^\{31\}/g, '³¹')
+         .replace(/\s+/g, ' ');
+    return s.trim();
+}
+
+function renderLatexOrFallback(latexExpr, displayMode = false) {
+    if (!latexExpr) return '';
+    let clean = latexExpr.trim();
+    if (clean.startsWith('$') && clean.endsWith('$')) {
+        clean = clean.slice(1, -1).trim();
+    }
+    if (typeof window.katex !== 'undefined' && window.katex.renderToString) {
+        try {
+            return window.katex.renderToString(clean, {
+                throwOnError: false,
+                displayMode: displayMode
+            });
+        } catch (e) {
+            console.warn('KaTeX render error:', e);
+        }
+    }
+    return `<span class="math-fallback">${cleanLatexToUnicode(clean)}</span>`;
+}
+
+function renderMarkdownAndMath(text) {
+    if (!text) return '';
+
+    // 1. Process inline math: $ ... $
+    let html = text.replace(/\$([^\$]+)\$/g, (match, expr) => {
+        return renderLatexOrFallback(expr, false);
+    });
+
+    // 2. Process bold: **text**
+    html = html.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+
+    // 3. Process italic: *text* (avoiding isolated asterisks)
+    html = html.replace(/(^|[^\*])\*([^\*]+)\*([^\*]|$)/g, '$1<em>$2</em>$3');
+
+    // 4. Process inline code: `code`
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    return html;
+}
+
+function parseBounds(boundsStr) {
+    if (!boundsStr) return { timeRaw: '', spaceRaw: '', timeClean: '—', spaceClean: '—' };
+    const parts = boundsStr.split('|');
+    const timeRaw = parts[0] ? parts[0].replace('Time Complexity:', '').trim() : '';
+    const spaceRaw = parts[1] ? parts[1].replace('Space Complexity:', '').trim() : '';
+    return {
+        timeRaw,
+        spaceRaw,
+        timeClean: cleanLatexToUnicode(timeRaw) || '—',
+        spaceClean: cleanLatexToUnicode(spaceRaw) || '—'
+    };
+}
+
+function renderSpotlightBoundsHTML(boundsStr) {
+    const { timeRaw, spaceRaw, timeClean, spaceClean } = parseBounds(boundsStr);
+    const timeHtml = timeRaw ? renderLatexOrFallback(timeRaw) : timeClean;
+    const spaceHtml = spaceRaw ? renderLatexOrFallback(spaceRaw) : spaceClean;
+
+    return `
+        <div class="bounds-card">
+            <div class="bounds-metric">
+                <span class="bounds-badge-label">Time Complexity</span>
+                <span class="bounds-math-value">${timeHtml}</span>
+            </div>
+            <div class="bounds-metric-divider"></div>
+            <div class="bounds-metric">
+                <span class="bounds-badge-label">Space Complexity</span>
+                <span class="bounds-math-value">${spaceHtml}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderTableBoundsHTML(boundsStr) {
+    const { timeRaw, spaceRaw, timeClean, spaceClean } = parseBounds(boundsStr);
+    const timeHtml = timeRaw ? renderLatexOrFallback(timeRaw) : timeClean;
+    const spaceHtml = spaceRaw ? renderLatexOrFallback(spaceRaw) : spaceClean;
+
+    return `
+        <div class="table-complexity-pills">
+            <span class="c-pill c-time" title="Time Complexity">
+                <span class="c-pill-tag">T:</span> ${timeHtml}
+            </span>
+            <span class="c-pill c-space" title="Space Complexity">
+                <span class="c-pill-tag">S:</span> ${spaceHtml}
+            </span>
+        </div>
+    `;
+}
+
+function renderMantraHTML(mantraText) {
+    if (!mantraText || !mantraText.trim()) return '';
+    const lines = mantraText.split('\n');
+    let itemsHtml = '';
+
+    lines.forEach(line => {
+        let trimmed = line.trim();
+        if (!trimmed) return;
+
+        // Skip duplicate asymptotic bounds line if present
+        if (trimmed.includes('Asymptotic Bounds:')) return;
+
+        // Strip leading "- " or "* "
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            trimmed = trimmed.slice(2).trim();
+        }
+
+        // Check for key tag prefix (e.g. "Invariant:", "Mechanics:", "Edge:", "Step 1:")
+        const match = trimmed.match(/^([A-Za-z0-9\s]+):(.*)$/);
+        if (match) {
+            const key = match[1].trim();
+            const desc = match[2].trim();
+            const lowerKey = key.toLowerCase();
+            let tagClass = 'tag-default';
+            if (lowerKey.includes('invariant')) tagClass = 'tag-invariant';
+            else if (lowerKey.includes('mechanic')) tagClass = 'tag-mechanics';
+            else if (lowerKey.includes('edge')) tagClass = 'tag-edge';
+
+            itemsHtml += `
+                <li class="mantra-item">
+                    <span class="mantra-tag ${tagClass}">${key}</span>
+                    <div class="mantra-desc">${renderMarkdownAndMath(desc)}</div>
+                </li>
+            `;
+        } else {
+            itemsHtml += `
+                <li class="mantra-item mantra-item-bullet">
+                    <span class="mantra-bullet-icon">✦</span>
+                    <div class="mantra-desc">${renderMarkdownAndMath(trimmed)}</div>
+                </li>
+            `;
+        }
+    });
+
+    return `<ul class="mantra-list">${itemsHtml}</ul>`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.SDE_SHEET_DATA) {
         console.error('SDE_SHEET_DATA not found. Please ensure sde_sheet_data.js is loaded.');
@@ -178,19 +356,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Titles
         problemMainTitle.textContent = prob.canonicalName;
-        problemSummaryText.textContent = prob.title;
+        problemSummaryText.innerHTML = renderMarkdownAndMath(prob.title);
 
         // Bounds
         if (prob.bounds) {
-            boundsContent.innerHTML = `<strong>Complexity:</strong> <code>${prob.bounds}</code>`;
-            boundsContent.style.display = 'flex';
+            boundsContent.innerHTML = renderSpotlightBoundsHTML(prob.bounds);
+            boundsContent.style.display = 'block';
         } else {
             boundsContent.style.display = 'none';
         }
 
         // Mantra
         if (prob.mantra && prob.mantra.trim()) {
-            mantraText.textContent = prob.mantra;
+            mantraText.innerHTML = renderMantraHTML(prob.mantra);
             mantraCallout.style.display = 'block';
         } else {
             mantraCallout.style.display = 'none';
@@ -295,7 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="diff-badge diff-${p.difficulty.toLowerCase()}">${p.difficulty}</span>
                 </td>
                 <td style="color: var(--gray-600); font-size: 0.8125rem;">
-                    ${p.bounds ? `<code>${p.bounds.replace('Time Complexity:', 'T:').replace('Space Complexity:', 'S:')}</code>` : '—'}
+                    ${p.bounds ? renderTableBoundsHTML(p.bounds) : '—'}
                 </td>
                 <td style="text-align: right; width: 140px;">
                     <button class="btn btn-outline btn-small btn-type-row" data-pid="${p.patternId}" data-seq="${p.problemSeq}">
@@ -456,4 +634,10 @@ document.addEventListener('DOMContentLoaded', () => {
     selectLanguage(currentLang);
     renderProblemView();
     renderCurriculumList();
+
+    // Hook for when KaTeX script finishes loading asynchronously
+    window.onKaTeXReady = () => {
+        renderProblemView();
+        renderCurriculumList();
+    };
 });
