@@ -1373,6 +1373,9 @@ body {
   background: var(--gray-100);
   border-bottom: 1px solid var(--gray-200);
   padding: 0 var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .editor-tabs {
@@ -1401,6 +1404,53 @@ body {
   background: var(--orange-500);
 }
 
+.editor-actions {
+  display: flex;
+  align-items: center;
+}
+
+.btn-skip-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  background: white;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms var(--ease-out);
+  font-family: var(--font-sans);
+  user-select: none;
+  outline: none;
+}
+
+.btn-skip-line:hover {
+  background: var(--gray-50);
+  color: var(--gray-900);
+  border-color: var(--gray-400);
+  transform: translateY(-1px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.btn-skip-line:active {
+  transform: translateY(0);
+}
+
+.btn-skip-line .skip-key-badge {
+  display: inline-block;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-300);
+  color: var(--gray-600);
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  line-height: 1.3;
+}
+
 /* Disable programming ligatures across all code displays and editors */
 .editor,
 .editor-body,
@@ -1426,12 +1476,12 @@ code {
   border-right: 1px solid var(--gray-200);
   padding: var(--space-4) var(--space-3);
   font-family: var(--font-mono);
-  font-size: 0.875rem;
+  font-size: 1.05rem;
   color: var(--gray-400);
   text-align: right;
   user-select: none;
   min-width: 60px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .code-area {
@@ -1442,8 +1492,8 @@ code {
 .code-display {
   padding: var(--space-4);
   font-family: var(--font-mono);
-  font-size: 0.875rem;
-  line-height: 1.6;
+  font-size: 1.05rem;
+  line-height: 1.65;
   color: var(--gray-900);
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -1466,60 +1516,88 @@ code {
   -webkit-font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
 }
 
+.char.char-newline {
+  display: inline;
+}
+
 .char.correct {
   background: transparent;
   color: #0f172a;
 }
 
-/* Dynamic Syntax Highlighting for Typed Code */
+/* Focused, calm syntax coloring (avoiding rainbow & warm red/orange alerts) */
 .char.correct.token-keyword,
 .char.correct.token-directive,
 .char.correct.token-directive-hash,
 .char.correct.token-macro,
 .char.correct.token-atrule {
-  color: #7c3aed;
+  color: #2563eb;
   font-weight: 500;
 }
 
 .char.correct.token-function {
-  color: #2563eb;
+  color: #0f172a;
 }
 
 .char.correct.token-class-name,
 .char.correct.token-builtin,
 .char.correct.token-type {
-  color: #0891b2;
+  color: #0369a1;
 }
 
 .char.correct.token-string,
 .char.correct.token-triple-quoted-string,
 .char.correct.token-char {
-  color: #059669;
+  color: #15803d;
 }
 
 .char.correct.token-number,
 .char.correct.token-boolean,
 .char.correct.token-constant {
-  color: #d97706;
+  color: #0f172a;
 }
 
 .char.correct.token-operator {
-  color: #475569;
+  color: #334155;
 }
 
 .char.correct.token-punctuation {
-  color: #64748b;
+  color: #475569;
 }
 
+/* Mistyped character: the ONLY place where red is used */
 .char.incorrect {
-  background: rgb(239 68 68 / 0.15);
-  color: var(--red-500);
+  background: rgba(239, 68, 68, 0.16);
+  color: #dc2626;
+  border-radius: 2px;
 }
 
+/* ===== TYPING CURSOR (I-BEAM) ===== */
 .char.current {
-  background: var(--blue-500);
-  color: white;
-  animation: pulse 1.5s infinite;
+  position: relative;
+  background: transparent;
+  color: inherit;
+}
+
+.char.current::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 0.12em;
+  height: 1.2em;
+  width: 6px;
+  background: 
+    linear-gradient(#0f172a, #0f172a) no-repeat top / 100% 1.5px,
+    linear-gradient(#0f172a, #0f172a) no-repeat bottom / 100% 1.5px,
+    linear-gradient(#0f172a, #0f172a) no-repeat center / 1.5px 100%;
+  animation: cursorBlink 1s steps(1) infinite;
+  z-index: 10;
+  pointer-events: none;
+}
+
+@keyframes cursorBlink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 .char.untyped {
@@ -1527,8 +1605,9 @@ code {
 }
 
 .char.comment {
-  color: #334155;
+  color: #94a3b8;
   font-style: italic;
+  opacity: 0.85;
   background: transparent;
 }
 
@@ -1546,11 +1625,6 @@ code {
   color: #cbd5e1;
   background: transparent;
   opacity: 0.5;
-}
-
-@keyframes pulse {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0.7; }
 }
 
 /* ===== PROGRESS ===== */
@@ -1599,46 +1673,6 @@ code {
   display: none;
 }
 
-/* ===== SKIP LINE BUTTON ===== */
-.skip-line-button {
-  display: none;
-  align-items: center;
-  gap: var(--space-2);
-  position: absolute;
-  padding: var(--space-1) var(--space-3);
-  background: var(--gray-700);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: var(--shadow-md);
-  transition: all 150ms var(--ease-out);
-  z-index: 1000;
-  white-space: nowrap;
-  font-family: var(--font-sans);
-  -webkit-user-select: none;
-  user-select: none;
-  outline: none;
-}
-
-.skip-line-button:hover {
-  background: var(--gray-800);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
-}
-
-.skip-line-button:active {
-  transform: translateY(0);
-  box-shadow: var(--shadow-sm);
-}
-
-.skip-line-button svg {
-  width: 12px;
-  height: 12px;
-  stroke-width: 2;
-}
 
 .skip-key-badge {
   display: inline-block;

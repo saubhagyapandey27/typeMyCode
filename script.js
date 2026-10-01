@@ -10,7 +10,6 @@ class TypingSpeedApp {
         this.leadingWhitespacePositions = new Set(); // Positions that are leading whitespace
         this.optionalSpacePositions = new Set(); // Positions where space is syntactically optional
         this.currentPosition = 0;
-        this.skipButton = null; // Reference to the skip button
         this.currentLineStartPos = 0; // Start position of current line
         this.currentLineEndPos = 0; // End position of current line
         this.skippedCharacters = 0; // Count of characters skipped via button
@@ -229,6 +228,8 @@ class TypingSpeedApp {
         this.closeModal = document.getElementById('closeModal');
         this.modalOverlay = document.querySelector('.modal-overlay');
 
+        this.skipLineHeaderBtn = document.getElementById('skipLineHeaderBtn');
+
         // SDE Sheet Elements
         this.practiceSdeNavBtn = document.getElementById('practiceSdeNavBtn');
         this.sdePracticeBanner = document.getElementById('sdePracticeBanner');
@@ -267,6 +268,19 @@ class TypingSpeedApp {
         if (this.resetButton) {
             this.resetButton.addEventListener('click', () => this.resetTyping());
         }
+        if (this.skipLineHeaderBtn) {
+            this.skipLineHeaderBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!this.startTime) {
+                    this.startTime = Date.now();
+                    this.startTimer();
+                }
+                this.skipCurrentLine();
+                if (this.textDisplay) {
+                    this.textDisplay.focus();
+                }
+            });
+        }
         if (this.textDisplay) {
             this.textDisplay.addEventListener('keydown', (e) => this.handleKeydown(e));
             this.textDisplay.addEventListener('click', () => this.textDisplay.focus());
@@ -283,29 +297,6 @@ class TypingSpeedApp {
                 this.closeModalHandler();
             }
         });
-        
-        // Window resize and scroll events for skip button positioning
-        window.addEventListener('resize', () => {
-            if (this.skipButton && this.skipButton.style.display !== 'none') {
-                this.positionSkipButton();
-            }
-        });
-        
-        window.addEventListener('scroll', () => {
-            if (this.skipButton && this.skipButton.style.display !== 'none') {
-                this.positionSkipButton();
-            }
-        });
-
-        // Code area scroll listener
-        const codeArea = document.querySelector('.code-area');
-        if (codeArea) {
-            codeArea.addEventListener('scroll', () => {
-                if (this.skipButton && this.skipButton.style.display !== 'none') {
-                    this.positionSkipButton();
-                }
-            });
-        }
 
         // SDE Sheet prev / next navigation buttons
         if (this.sdeBannerPrevBtn) {
@@ -512,12 +503,6 @@ class TypingSpeedApp {
         this.startTime = null;
         if (this.practiceTextArea) {
             this.practiceTextArea.focus();
-        }
-        
-        // Clean up skip button
-        if (this.skipButton) {
-            this.skipButton.remove();
-            this.skipButton = null;
         }
     }
 
@@ -883,14 +868,22 @@ class TypingSpeedApp {
         
         // Add current class to current position
         if (this.currentPosition < chars.length) {
-            chars[this.currentPosition].classList.add('current');
+            const currentChar = chars[this.currentPosition];
+            currentChar.classList.add('current');
+
+            // Auto scroll active cursor line into view smoothly
+            const codeArea = document.querySelector('.code-area');
+            if (codeArea && currentChar) {
+                const charRect = currentChar.getBoundingClientRect();
+                const areaRect = codeArea.getBoundingClientRect();
+                if (charRect.top < areaRect.top + 30 || charRect.bottom > areaRect.bottom - 30) {
+                    currentChar.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            }
         }
         
         // Update current line boundaries
         this.updateCurrentLineBoundaries();
-        
-        // Show/hide skip button
-        this.updateSkipButton();
     }
     
     updateCurrentLineBoundaries() {
@@ -910,91 +903,6 @@ class TypingSpeedApp {
         
         this.currentLineStartPos = lineStart;
         this.currentLineEndPos = lineEnd;
-    }
-    
-    createSkipButton() {
-        if (this.skipButton) {
-            this.skipButton.remove();
-        }
-        
-        this.skipButton = document.createElement('button');
-        this.skipButton.className = 'skip-line-button';
-        this.skipButton.setAttribute('type', 'button');
-        this.skipButton.innerHTML = `
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2L14 8L8 14M14 8H2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>Skip line</span>
-            <kbd class="skip-key-badge">Tab</kbd>
-        `;
-        this.skipButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.skipCurrentLine();
-        });
-        
-        // Prevent button from taking focus away from editor
-        this.skipButton.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-        });
-        
-        document.body.appendChild(this.skipButton);
-        return this.skipButton;
-    }
-    
-    updateSkipButton() {
-        if (this.currentPosition >= this.practiceText.length) {
-            if (this.skipButton) {
-                this.skipButton.style.display = 'none';
-            }
-            return;
-        }
-
-        // Check if there is remaining typable content on the current line
-        let hasRemainingContent = false;
-        for (let i = this.currentPosition; i < this.currentLineEndPos; i++) {
-            if (!this.skipPositions.has(i)) {
-                hasRemainingContent = true;
-                break;
-            }
-        }
-        
-        // Show button whenever cursor is on a line with typable content
-        if (hasRemainingContent) {
-            if (!this.skipButton) {
-                this.createSkipButton();
-            }
-            this.positionSkipButton();
-            this.skipButton.style.display = 'inline-flex';
-        } else {
-            if (this.skipButton) {
-                this.skipButton.style.display = 'none';
-            }
-        }
-    }
-    
-    positionSkipButton() {
-        if (!this.skipButton) return;
-        
-        const chars = this.textDisplay?.children;
-        if (!chars || chars.length === 0) return;
-
-        const targetIndex = Math.min(Math.max(0, this.currentLineEndPos - 1), chars.length - 1);
-        const charElem = chars[targetIndex];
-        if (charElem) {
-            const rect = charElem.getBoundingClientRect();
-            const viewportWidth = window.innerWidth;
-            
-            let leftPos = rect.right + 12;
-            if (leftPos + 130 > viewportWidth) {
-                leftPos = Math.max(10, viewportWidth - 140);
-            }
-
-            this.skipButton.style.position = 'fixed';
-            this.skipButton.style.left = `${leftPos}px`;
-            this.skipButton.style.top = `${rect.top}px`;
-            this.skipButton.style.zIndex = '1000';
-        }
     }
     
     skipCurrentLine() {
@@ -1041,11 +949,6 @@ class TypingSpeedApp {
         this.updateDisplay();
         this.updateStats();
         
-        // Hide skip button and refocus
-        if (this.skipButton) {
-            this.skipButton.style.display = 'none';
-        }
-        
         setTimeout(() => {
             if (this.textDisplay) {
                 this.textDisplay.focus();
@@ -1077,12 +980,6 @@ class TypingSpeedApp {
         this.startTime = null;
         if (this.textDisplay) {
             this.textDisplay.focus();
-        }
-        
-        // Clean up skip button
-        if (this.skipButton) {
-            this.skipButton.remove();
-            this.skipButton = null;
         }
     }
 
@@ -1329,6 +1226,9 @@ class TypingSpeedApp {
             
             // Reset classes
             char.className = 'char';
+            if (this.practiceText[i] === '\n') {
+                char.classList.add('char-newline');
+            }
             
             if (this.skipPositions.has(i)) {
                 // Check if this is leading whitespace or a comment
@@ -1357,11 +1257,6 @@ class TypingSpeedApp {
         const progress = (this.currentPosition / this.practiceText.length) * 100;
         this.progressFill.style.width = `${progress}%`;
         this.progressPercent.textContent = `${Math.round(progress)}%`;
-        
-        // Update skip button position if it's visible
-        if (this.skipButton && this.skipButton.style.display !== 'none') {
-            this.positionSkipButton();
-        }
     }
 
     updateStats() {
