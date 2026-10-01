@@ -21,6 +21,15 @@
                     <span class="brand-name">typeMyCode</span>
             </div>
             <div class="nav-links">
+                <a href="sde-sheet.html" class="btn btn-outline btn-small" id="navSdeButton">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        <line x1="9" y1="7" x2="15" y2="7"/>
+                        <line x1="9" y1="11" x2="13" y2="11"/>
+                    </svg>
+                    Strivers SDE Sheet
+                </a>
                 <button class="btn btn-primary btn-small" id="navStartButton">Start Practicing</button>
             </div>
         </div>
@@ -42,11 +51,21 @@
                     
                     <div class="hero-cta">
                         <button id="heroStartButton" class="btn btn-hero">
-                            <svg width="20" height="40" viewBox="0 0 20 20" fill="none">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                                 <path d="M6.5 5.5L13.5 10L6.5 14.5V5.5Z" fill="currentColor"/>
                             </svg>
                             Start Practicing
                         </button>
+                        <a href="sde-sheet.html" id="heroSdeButton" class="btn btn-hero btn-hero-secondary">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                                <line x1="9" y1="7" x2="15" y2="7"/>
+                                <line x1="9" y1="11" x2="13" y2="11"/>
+                            </svg>
+                            Strivers SDE Sheet
+                            <span class="hero-badge">191 Problems</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -89,6 +108,9 @@
                             <button id="sampleButton" class="btn btn-ghost btn-small">
                                 Load sample
                             </button>
+                            <a href="sde-sheet.html" class="btn btn-outline btn-small" style="margin-right:auto; margin-left:8px;">
+                                ⚡ Strivers SDE Sheet (191) →
+                            </a>
                             <button id="startButton" class="btn btn-primary btn-large">
                                 Start Practice Session
                             </button>
@@ -130,6 +152,13 @@
                             </svg>
                             Back
                         </button>
+                        <a href="sde-sheet.html" id="practiceSdeNavBtn" class="btn btn-ghost btn-small hidden" title="Back to Strivers SDE Sheet">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                            </svg>
+                            SDE Sheet
+                        </a>
                         <button id="resetButton" class="btn btn-outline btn-small">
                             Reset
                         </button>
@@ -148,6 +177,21 @@
                             <div class="stat-value" id="timer">00:00</div>
                             <div class="stat-label">Time</div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- SDE Practice Banner (Shown when practicing SDE Sheet code) -->
+                <div id="sdePracticeBanner" class="sde-practice-banner hidden">
+                    <div class="sde-practice-info">
+                        <span id="sdeBannerSeq" class="seq-badge">P01 • Q01</span>
+                        <span id="sdeBannerDiff" class="diff-badge diff-easy">Easy</span>
+                        <span id="sdeBannerTitle" class="sde-practice-title">Remove duplicates from sorted array</span>
+                        <span id="sdeBannerPattern" class="sde-practice-sub">Pattern 01: Two Pointers and Partitioning</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="sdeBannerPrevBtn" class="btn btn-outline btn-small" title="Previous SDE Problem">← Prev</button>
+                        <button id="sdeBannerNextBtn" class="btn btn-outline btn-small" title="Next SDE Problem">Next →</button>
+                        <a href="sde-sheet.html" class="btn btn-ghost btn-small">Sheet List ↗</a>
                     </div>
                 </div>
 
@@ -183,6 +227,7 @@
     </main>
 
     <script src="prism.min.js"></script>
+    <script src="sde_sheet_data.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

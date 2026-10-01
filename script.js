@@ -16,10 +16,12 @@ class TypingSpeedApp {
         this.manuallyTypedCharacters = 0; // Count of characters manually typed
         this.correctManualCharacters = 0; // Count of correctly manually typed characters
         this.syntaxMap = []; // Character index to syntax token mapping
+        this.currentSdeProblem = null;
         
         this.initializeElements();
         this.bindEvents();
         this.createNotificationContainer();
+        this.checkSdeSheetLoad();
     }
 
     createNotificationContainer() {
@@ -97,6 +99,20 @@ class TypingSpeedApp {
         modal.setAttribute('aria-modal', 'true');
         modal.setAttribute('aria-labelledby', 'completionTitle');
         
+        const isSde = !!this.currentSdeProblem;
+        const msg = isSde
+            ? `Completed <strong>Pattern ${this.currentSdeProblem.patternId}: ${this.currentSdeProblem.title}</strong>!`
+            : 'Practice complete! Ready to tackle your next DSA problem?';
+
+        const actionsHtml = isSde ? `
+            <button class="btn btn-primary btn-medium" id="modalNextSdeBtn">Next SDE Problem (Enter) →</button>
+            <button class="btn btn-outline btn-medium" id="modalTryAgainBtn">Try Again</button>
+            <a href="sde-sheet.html?pattern=${this.currentSdeProblem.patternId}&problem=${this.currentSdeProblem.problemSeq}" class="btn btn-ghost btn-medium">Back to Sheet (Esc)</a>
+        ` : `
+            <button class="btn btn-primary btn-medium" id="modalTryAgainBtn">Try Again (Enter)</button>
+            <button class="btn btn-outline btn-medium" id="modalNewTextBtn">New Problem (Esc)</button>
+        `;
+
         modal.innerHTML = `
             <div class="completion-header">
                 <h2 id="completionTitle">🎉 Congratulations!</h2>
@@ -104,7 +120,7 @@ class TypingSpeedApp {
             </div>
             <div class="completion-content">
                 <div class="completion-message">
-                    <p>Practice complete! Ready to tackle your next DSA problem?</p>
+                    <p>${msg}</p>
                 </div>
                 <div class="completion-stats">
                     <div class="stat-item">
@@ -121,8 +137,7 @@ class TypingSpeedApp {
                     </div>
                 </div>
                 <div class="completion-actions">
-                    <button class="btn btn-primary btn-medium" id="modalTryAgainBtn">Try Again (Enter)</button>
-                    <button class="btn btn-outline btn-medium" id="modalNewTextBtn">New Problem (Esc)</button>
+                    ${actionsHtml}
                 </div>
             </div>
         `;
@@ -145,9 +160,15 @@ class TypingSpeedApp {
             this.goBackToTextInput();
         };
 
+        const nextSde = () => {
+            closeModal();
+            this.navigateSdeProblem(1);
+        };
+
         modal.querySelector('#modalCloseBtn')?.addEventListener('click', closeModal);
         modal.querySelector('#modalTryAgainBtn')?.addEventListener('click', tryAgain);
         modal.querySelector('#modalNewTextBtn')?.addEventListener('click', newProblem);
+        modal.querySelector('#modalNextSdeBtn')?.addEventListener('click', nextSde);
         
         // Close on overlay click
         modalOverlay.addEventListener('click', (e) => {
@@ -159,9 +180,18 @@ class TypingSpeedApp {
         // Keyboard shortcuts inside modal
         const handleModalKeys = (e) => {
             if (e.key === 'Escape') {
-                newProblem();
+                if (isSde) {
+                    closeModal();
+                    window.location.href = `sde-sheet.html?pattern=${this.currentSdeProblem.patternId}&problem=${this.currentSdeProblem.problemSeq}`;
+                } else {
+                    newProblem();
+                }
             } else if (e.key === 'Enter') {
-                tryAgain();
+                if (isSde) {
+                    nextSde();
+                } else {
+                    tryAgain();
+                }
             }
         };
         document.addEventListener('keydown', handleModalKeys);
@@ -195,6 +225,16 @@ class TypingSpeedApp {
         this.sampleButton = document.getElementById('sampleButton');
         this.closeModal = document.getElementById('closeModal');
         this.modalOverlay = document.querySelector('.modal-overlay');
+
+        // SDE Sheet Elements
+        this.practiceSdeNavBtn = document.getElementById('practiceSdeNavBtn');
+        this.sdePracticeBanner = document.getElementById('sdePracticeBanner');
+        this.sdeBannerSeq = document.getElementById('sdeBannerSeq');
+        this.sdeBannerDiff = document.getElementById('sdeBannerDiff');
+        this.sdeBannerTitle = document.getElementById('sdeBannerTitle');
+        this.sdeBannerPattern = document.getElementById('sdeBannerPattern');
+        this.sdeBannerPrevBtn = document.getElementById('sdeBannerPrevBtn');
+        this.sdeBannerNextBtn = document.getElementById('sdeBannerNextBtn');
     }
 
     bindEvents() {
@@ -262,6 +302,14 @@ class TypingSpeedApp {
                     this.positionSkipButton();
                 }
             });
+        }
+
+        // SDE Sheet prev / next navigation buttons
+        if (this.sdeBannerPrevBtn) {
+            this.sdeBannerPrevBtn.addEventListener('click', () => this.navigateSdeProblem(-1));
+        }
+        if (this.sdeBannerNextBtn) {
+            this.sdeBannerNextBtn.addEventListener('click', () => this.navigateSdeProblem(1));
         }
     }
 
@@ -337,6 +385,10 @@ class TypingSpeedApp {
     updateFileDisplayName() {
         const fileNameDisplay = document.getElementById('fileName');
         if (fileNameDisplay) {
+            if (this.currentSdeProblem && this.currentSdeProblem.fileName) {
+                fileNameDisplay.textContent = this.currentSdeProblem.fileName;
+                return;
+            }
             const language = this.languageSelect ? this.languageSelect.value : 'auto';
             let extension = '.txt';
             
@@ -440,6 +492,13 @@ class TypingSpeedApp {
     goBackToTextInput() {
         document.getElementById('typingSection').classList.add('hidden');
         document.getElementById('textInputSection').classList.remove('hidden');
+        if (this.sdePracticeBanner) {
+            this.sdePracticeBanner.classList.add('hidden');
+        }
+        if (this.practiceSdeNavBtn) {
+            this.practiceSdeNavBtn.classList.add('hidden');
+        }
+        this.currentSdeProblem = null;
         this.stopTimer();
         this.startTime = null;
         if (this.practiceTextArea) {
@@ -1159,6 +1218,163 @@ func BinarySearch(nums []int, target int) int {
         if (this.languageSelect) {
             this.languageSelect.value = detected;
         }
+    }
+
+    checkSdeSheetLoad() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let sdeData = null;
+
+        // 1. Check localStorage first
+        try {
+            const cached = localStorage.getItem('sde_active_problem');
+            if (cached) {
+                sdeData = JSON.parse(cached);
+                // Clear after retrieving so subsequent page refreshes behave normally
+                localStorage.removeItem('sde_active_problem');
+            }
+        } catch (e) {
+            console.warn('Error reading sde_active_problem from localStorage:', e);
+        }
+
+        // 2. Check URL query parameters if available
+        if (urlParams.has('p') && window.SDE_SHEET_DATA) {
+            const pId = parseInt(urlParams.get('p'), 10);
+            const qSeq = parseInt(urlParams.get('q') || '1', 10);
+            const lang = (urlParams.get('lang') || 'py').toLowerCase();
+
+            const pat = window.SDE_SHEET_DATA.patterns.find(p => p.id === pId);
+            const prob = window.SDE_SHEET_DATA.problems.find(p => p.patternId === pId && p.problemSeq === qSeq);
+
+            if (prob && pat) {
+                const code = lang === 'cpp' ? prob.cpp : prob.py;
+                const fileExt = lang === 'cpp' ? 'cpp' : 'py';
+                const cleanTitle = prob.canonicalName.replace(/[^a-zA-Z0-9_-]/g, '_');
+                sdeData = {
+                    fromSde: true,
+                    patternId: prob.patternId,
+                    patternName: pat.name,
+                    problemSeq: prob.problemSeq,
+                    title: prob.canonicalName,
+                    fullTitle: prob.title,
+                    difficulty: prob.difficulty,
+                    bounds: prob.bounds,
+                    language: lang === 'cpp' ? 'cpp' : 'python',
+                    fileName: `P${String(prob.patternId).padStart(2, '0')}_Q${String(prob.problemSeq).padStart(2, '0')}_${cleanTitle}.${fileExt}`,
+                    code: code,
+                    timestamp: Date.now()
+                };
+            }
+        }
+
+        if (sdeData && sdeData.code) {
+            this.loadSdeProblem(sdeData, true);
+        }
+    }
+
+    loadSdeProblem(data, shouldStartImmediately = true) {
+        this.currentSdeProblem = data;
+        if (this.practiceTextArea) {
+            this.practiceTextArea.value = data.code;
+        }
+        if (this.languageSelect) {
+            this.languageSelect.value = data.language;
+        }
+
+        // Update SDE banner
+        if (this.sdePracticeBanner) {
+            this.sdePracticeBanner.classList.remove('hidden');
+        }
+        if (this.practiceSdeNavBtn) {
+            this.practiceSdeNavBtn.classList.remove('hidden');
+            this.practiceSdeNavBtn.href = `sde-sheet.html?pattern=${data.patternId}&problem=${data.problemSeq}`;
+        }
+        if (this.sdeBannerSeq) {
+            this.sdeBannerSeq.textContent = `P${String(data.patternId).padStart(2, '0')} • Q${String(data.problemSeq).padStart(2, '0')}`;
+        }
+        if (this.sdeBannerDiff) {
+            this.sdeBannerDiff.textContent = data.difficulty;
+            this.sdeBannerDiff.className = `diff-badge diff-${data.difficulty.toLowerCase()}`;
+        }
+        if (this.sdeBannerTitle) {
+            this.sdeBannerTitle.textContent = data.title;
+        }
+        if (this.sdeBannerPattern) {
+            this.sdeBannerPattern.textContent = `Pattern ${String(data.patternId).padStart(2, '0')}: ${data.patternName}`;
+        }
+
+        const fileNameDisplay = document.getElementById('fileName');
+        if (fileNameDisplay) {
+            fileNameDisplay.textContent = data.fileName;
+        }
+
+        if (shouldStartImmediately) {
+            this.startTypingPractice();
+            this.showNotification(`Loaded Striver's SDE Sheet: Pattern ${data.patternId} • Problem ${data.problemSeq} (${data.language === 'cpp' ? 'C++' : 'Python'})`, 'success', 3500);
+        }
+    }
+
+    navigateSdeProblem(offset) {
+        if (!this.currentSdeProblem || !window.SDE_SHEET_DATA) return;
+        const { patterns, problems } = window.SDE_SHEET_DATA;
+
+        const currentPatId = this.currentSdeProblem.patternId;
+        const currentSeq = this.currentSdeProblem.problemSeq;
+        const lang = this.currentSdeProblem.language; // 'python' or 'cpp'
+        const pat = patterns.find(p => p.id === currentPatId);
+        if (!pat) return;
+
+        let nextSeq = currentSeq + offset;
+        let nextPatId = currentPatId;
+
+        if (nextSeq > pat.count) {
+            // Move to next pattern
+            if (nextPatId < patterns.length) {
+                nextPatId += 1;
+                nextSeq = 1;
+            } else {
+                this.showNotification("You've reached the end of the 191 SDE problems! 🎉", 'success');
+                return;
+            }
+        } else if (nextSeq < 1) {
+            // Move to previous pattern
+            if (nextPatId > 1) {
+                nextPatId -= 1;
+                const prevPat = patterns.find(p => p.id === nextPatId);
+                nextSeq = prevPat.count;
+            } else {
+                this.showNotification("You're already at the first problem!", 'info');
+                return;
+            }
+        }
+
+        const nextPat = patterns.find(p => p.id === nextPatId);
+        const nextProb = problems.find(p => p.patternId === nextPatId && p.problemSeq === nextSeq);
+        if (!nextProb) return;
+
+        const code = lang === 'cpp' ? nextProb.cpp : nextProb.py;
+        const fileExt = lang === 'cpp' ? 'cpp' : 'py';
+        const cleanTitle = nextProb.canonicalName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+        const newPayload = {
+            fromSde: true,
+            patternId: nextProb.patternId,
+            patternName: nextPat.name,
+            problemSeq: nextProb.problemSeq,
+            title: nextProb.canonicalName,
+            fullTitle: nextProb.title,
+            difficulty: nextProb.difficulty,
+            bounds: nextProb.bounds,
+            language: lang,
+            fileName: `P${String(nextProb.patternId).padStart(2, '0')}_Q${String(nextProb.problemSeq).padStart(2, '0')}_${cleanTitle}.${fileExt}`,
+            code: code,
+            timestamp: Date.now()
+        };
+
+        // Update URL query state without full reload
+        const newUrl = `index.html?from=sde&p=${nextProb.patternId}&q=${nextProb.problemSeq}&lang=${lang === 'cpp' ? 'cpp' : 'py'}`;
+        window.history.replaceState({}, '', newUrl);
+
+        this.loadSdeProblem(newPayload, true);
     }
 
     completeTyping() {
